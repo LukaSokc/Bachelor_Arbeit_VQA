@@ -3,7 +3,7 @@ from pathlib import Path
 
 current_file = Path(__file__).resolve()
 
-project_root = current_file.parent.parent  # -> `Bachelor_Arbeit_VQA/`
+project_root = current_file.parent.parent  # -> Bachelor_Arbeit_VQA/
 
 save_path = project_root / "data" / "raw"
 
