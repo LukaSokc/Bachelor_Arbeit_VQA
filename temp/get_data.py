@@ -5,7 +5,7 @@ current_file = Path(__file__).resolve()
 
 project_root = current_file.parent.parent  # -> Bachelor_Arbeit_VQA/
 
-save_path = project_root / "data" / "raw"
+save_path = project_root / "data"
 
 dataset = load_dataset("flaviagiammarino/path-vqa")
 
