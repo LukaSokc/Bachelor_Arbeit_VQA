@@ -12,4 +12,17 @@ ruff
 scikit-learn
 tqdm
 typer
+torch
+torchvision
+torchaudio
+matplotlib
+datasets
+torchvision.models
+Pillow
+torch.nn
+torch.optim
+numpy
+opencv-python
+shap
+transformers
 -e .
