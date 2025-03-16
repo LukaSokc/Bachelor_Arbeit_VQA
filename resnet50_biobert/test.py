@@ -107,7 +107,7 @@ def main():
     ).to(device)
 
     # Lade Bestes Modell
-    best_model_path = os.path.join(cfg.MODEL_DIR, "resnet50_biobert_best.pt")  # <--- anpassen
+    best_model_path = os.path.join(cfg.MODEL_DIR, "resnet50_biobert_2025-03-16_17-50-04.pt")  # <--- anpassen
     if not os.path.exists(best_model_path):
         raise FileNotFoundError(f"Checkpoint {best_model_path} nicht gefunden!")
 
