@@ -79,25 +79,32 @@ class TraPVQA(nn.Module):
         self.decoder_embedding = nn.Embedding(vocab_size, 512)
         self.pos_encoding_dec = PositionalEncoding(d_model=512, max_len=50)
 
+        # Wichtig: Output-Layer für Token-Vorhersage => (B, seq_len, vocab_size)
         self.output_layer = nn.Linear(512, vocab_size)
 
     def forward(self, images, input_ids, attention_mask, decoder_input_ids=None):
-        # 1) Textfeatures
-        xq = self.text_encoder(input_ids, attention_mask)   # (B, lQ, 512)
-        # 2) Bildfeatures
-        xi = self.image_encoder(images)                     # (B, 49, 512)
+        """
+        images: (B, 3, 224, 224) [ResNet oder ViT erwartet], -> image_encoder -> (B, 49, 512)
+        input_ids, attention_mask: für Text-Encoder (B, lQ)
+        decoder_input_ids: (B, lAns) => Teacher Forcing (wenn vorhanden)
+        """
+        # 1) Frage-Features: (B, lQ, 512)
+        xq = self.text_encoder(input_ids, attention_mask)
+
+        # 2) Bild-Features: (B, 49, 512)
+        xi = self.image_encoder(images)
 
         # 3) Transformer Encoder
         combined = torch.cat([xq, xi], dim=1)  # (B, lQ+49, 512)
         enc_out = self.transformer_encoder(combined)
 
-        # 4) Transformer Decoder
-        if self.training and decoder_input_ids is not None:
-            # Teacher Forcing
+        # 4) Decoder: Teacher Forcing oder Inference
+        if decoder_input_ids is not None:
+            # => Teacher Forcing => (B, lAns, vocab_size)
             tgt_emb = self.decoder_embedding(decoder_input_ids)  # (B, lAns, 512)
-            tgt_emb = tgt_emb.transpose(0, 1)  # => (lAns, B, 512)
-            tgt_emb = self.pos_encoding_dec(tgt_emb)
-            tgt_emb = tgt_emb.transpose(0, 1)  # => (B, lAns, 512)
+            tgt_emb = tgt_emb.transpose(0, 1)                    # (lAns, B, 512)
+            tgt_emb = self.pos_encoding_dec(tgt_emb)             # (lAns, B, 512)
+            tgt_emb = tgt_emb.transpose(0, 1)                    # (B, lAns, 512)
 
             lAns = decoder_input_ids.size(1)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(lAns).to(tgt_emb.device)
@@ -111,7 +118,7 @@ class TraPVQA(nn.Module):
             logits = self.output_layer(dec_out)  # (B, lAns, vocab_size)
             return logits
         else:
-            # Inference (Greedy)
+            # => Inference (auto-regressiv)
             max_len = 20
             batch_size = images.size(0)
             dec_input = torch.full((batch_size, 1), 2, dtype=torch.long, device=images.device)  # <SOS>=2
