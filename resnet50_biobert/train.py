@@ -13,9 +13,17 @@ from resnet50_biobert.model_text import BioBERTBiLSTM
 from resnet50_biobert.model_transformer import TraPVQA
 from transformers import AutoTokenizer
 
-def train_loop(model, dataloader, criterion, optimizer, device):
+def train_loop(model, dataloader, criterion, optimizer, device, epoch):
+    """
+    Train-Schleife mit SHIFT und Batch-Logging.
+    Gibt (avg_loss, batch_logs) zurück.
+    - avg_loss: mittlerer Loss über alle Batches
+    - batch_logs: Liste von [epoch, batch_idx, loss.item()]
+    """
     model.train()
     total_loss = 0
+    batch_logs = []
+
     for batch_idx, batch in enumerate(dataloader, start=1):
         images = batch["image"].to(device)
         input_ids = batch["input_ids"].to(device)
@@ -23,30 +31,55 @@ def train_loop(model, dataloader, criterion, optimizer, device):
         decoder_input_ids = batch["decoder_input_ids"].to(device)
 
         optimizer.zero_grad()
+        # logits: (B, seq_len, vocab_size)
         logits = model(images, input_ids, attention_mask, decoder_input_ids)
-        loss = criterion(logits.transpose(1, 2), decoder_input_ids)
+
+        # SHIFT:
+        shifted_logits = logits[:, :-1, :].contiguous()  # (B, seq_len-1, vocab_size)
+        shifted_labels = decoder_input_ids[:, 1:].contiguous()  # (B, seq_len-1)
+
+        loss = criterion(shifted_logits.transpose(1, 2), shifted_labels)
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-        print(f"Train Batch {batch_idx}/{len(dataloader)} | Batch Loss: {loss.item():.4f}")
 
-    return total_loss / len(dataloader)
+        print(f"[Epoch {epoch}] Train Batch {batch_idx}/{len(dataloader)} | Batch Loss: {loss.item():.4f}")
+        batch_logs.append([epoch, batch_idx, loss.item()])
 
-def val_loop(model, dataloader, criterion, device):
+    avg_loss = total_loss / len(dataloader)
+    return avg_loss, batch_logs
+
+
+def val_loop(model, dataloader, criterion, device, epoch):
+    """
+    Validation-Schleife mit SHIFT und Batch-Logging.
+    Gibt (avg_loss, batch_logs) zurück.
+    """
     model.eval()
     total_loss = 0
+    batch_logs = []
+
     with torch.no_grad():
-        for batch in dataloader:
+        for batch_idx, batch in enumerate(dataloader, start=1):
             images = batch["image"].to(device)
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             decoder_input_ids = batch["decoder_input_ids"].to(device)
 
             logits = model(images, input_ids, attention_mask, decoder_input_ids)
-            loss = criterion(logits.transpose(1, 2), decoder_input_ids)
+
+            shifted_logits = logits[:, :-1, :].contiguous()
+            shifted_labels = decoder_input_ids[:, 1:].contiguous()
+
+            loss = criterion(shifted_logits.transpose(1, 2), shifted_labels)
             total_loss += loss.item()
-    return total_loss / len(dataloader)
+
+            batch_logs.append([epoch, batch_idx, loss.item()])
+
+    avg_loss = total_loss / len(dataloader)
+    return avg_loss, batch_logs
+
 
 def main():
     cfg = Config()
@@ -57,6 +90,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.BIOBERT_MODEL)
 
+    # Lade Datensätze
     train_arrow_dir = cfg.TRAIN_ARROW_DIR
     val_arrow_dir   = cfg.VAL_ARROW_DIR
     image_dir = cfg.DATA_DIR
@@ -77,6 +111,7 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=cfg.BATCH_SIZE, shuffle=True)
     val_loader   = DataLoader(val_ds, batch_size=cfg.BATCH_SIZE, shuffle=False)
 
+    # Modell
     text_encoder = BioBERTBiLSTM(
         biobert_model=cfg.BIOBERT_MODEL,
         lstm_hidden=256,
@@ -102,20 +137,29 @@ def main():
     criterion = nn.CrossEntropyLoss(ignore_index=0)
     optimizer = optim.Adam(model.parameters(), lr=cfg.LR)
 
-    # Listen für Logs
-    train_logs = []
-    val_logs = []
+    # Hier speichern wir epoch-level logs
+    epoch_train_logs = []
+    epoch_val_logs = []
+
+    # Hier speichern wir batch-level logs
+    all_train_batch_logs = []
+    all_val_batch_logs = []
 
     best_val_loss = float("inf")
-    for epoch in range(cfg.EPOCHS):
-        train_loss = train_loop(model, train_loader, criterion, optimizer, device)
-        val_loss   = val_loop(model,   val_loader,   criterion, device)
 
-        print(f"[Epoch {epoch+1}/{cfg.EPOCHS}] Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+    for epoch in range(1, cfg.EPOCHS + 1):
+        train_loss, train_batch_logs = train_loop(model, train_loader, criterion, optimizer, device, epoch)
+        val_loss, val_batch_logs = val_loop(model, val_loader, criterion, device, epoch)
 
-        # Logs sammeln
-        train_logs.append([epoch+1, train_loss])
-        val_logs.append([epoch+1, val_loss])
+        # Speichere pro-Batch-Logs
+        all_train_batch_logs.extend(train_batch_logs)
+        all_val_batch_logs.extend(val_batch_logs)
+
+        print(f"[Epoch {epoch}/{cfg.EPOCHS}] Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+
+        # Epochen-Logs
+        epoch_train_logs.append([epoch, train_loss])
+        epoch_val_logs.append([epoch, val_loss])
 
         # Checkpoint
         if val_loss < best_val_loss:
@@ -125,23 +169,41 @@ def main():
             torch.save(model.state_dict(), save_path)
             print(f"Best model saved at {save_path}")
 
-    # CSV-Logs speichern in docs/
+    # Erstelle Ordner
     os.makedirs("docs", exist_ok=True)
 
-    train_csv_path = os.path.join("docs", "train_logs.csv")
-    val_csv_path   = os.path.join("docs", "val_logs.csv")
+    # 1) Epochen-Logs in CSV
+    epoch_train_csv_path = os.path.join("docs", "train_epoch_logs.csv")
+    epoch_val_csv_path   = os.path.join("docs", "val_epoch_logs.csv")
 
-    with open(train_csv_path, "w", newline="", encoding="utf-8") as f:
+    with open(epoch_train_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["epoch", "train_loss"])
-        writer.writerows(train_logs)
-    print(f"Train logs of resnet50_biobert saved to {train_csv_path}")
+        writer.writerows(epoch_train_logs)
+    print(f"Epoch-level train logs saved to {epoch_train_csv_path}")
 
-    with open(val_csv_path, "w", newline="", encoding="utf-8") as f:
+    with open(epoch_val_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["epoch", "val_loss"])
-        writer.writerows(val_logs)
-    print(f"Validation logs of resnet50_biobert saved to {val_csv_path}")
+        writer.writerows(epoch_val_logs)
+    print(f"Epoch-level val logs saved to {epoch_val_csv_path}")
+
+    # 2) Batch-Logs in CSV
+    batch_train_csv_path = os.path.join("docs", "train_batch_logs.csv")
+    batch_val_csv_path   = os.path.join("docs", "val_batch_logs.csv")
+
+    with open(batch_train_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["epoch", "batch_idx", "train_loss"])
+        writer.writerows(all_train_batch_logs)
+    print(f"Batch-level train logs saved to {batch_train_csv_path}")
+
+    with open(batch_val_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["epoch", "batch_idx", "val_loss"])
+        writer.writerows(all_val_batch_logs)
+    print(f"Batch-level val logs saved to {batch_val_csv_path}")
+
 
 if __name__ == "__main__":
     main()
