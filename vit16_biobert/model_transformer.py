@@ -1,9 +1,4 @@
-"""
-src/model_transformer.py
-
-Transformer-Encoder/Decoder für TraP-VQA
-(2 Encoder-Layer, 2 Decoder-Layer, etc.)
-"""
+# src/model_transformer.py
 
 import torch
 import torch.nn as nn
@@ -20,28 +15,21 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        """
-        x: (seq_len, B, d_model)
-        """
         seq_len = x.size(0)
         x = x + self.pe[:seq_len, :].unsqueeze(1)
         return x
 
-
 class TransformerEncoderLayer(nn.TransformerEncoderLayer):
-    """ Wrapper für PyTorch TransformerEncoderLayer (batch_first=True) """
     pass
 
 class TransformerDecoderLayer(nn.TransformerDecoderLayer):
-    """ Wrapper für PyTorch TransformerDecoderLayer (batch_first=True) """
     pass
-
 
 class TraPVQA(nn.Module):
     """
     Gesamtmodell:
       - BioBERT+BiLSTM (Text) -> (B, lQ, 512)
-      - ResNet50 (Image) -> (B, 49, 512)
+      - ViT (Image) -> (B, 197, 512)
       - 2-Layer TransformerEncoder (fuse text+image)
       - 2-Layer TransformerDecoder (Antwort generieren)
     """
@@ -82,22 +70,22 @@ class TraPVQA(nn.Module):
         self.output_layer = nn.Linear(512, vocab_size)
 
     def forward(self, images, input_ids, attention_mask, decoder_input_ids=None):
-        # 1) Textfeatures
+        # 1) Text-Features
         xq = self.text_encoder(input_ids, attention_mask)   # (B, lQ, 512)
-        # 2) Bildfeatures
-        xi = self.image_encoder(images)                     # (B, 49, 512)
+        # 2) Bild-Features
+        xi = self.image_encoder(images)                     # (B, 197, 512) (ViT)
 
-        # 3) Transformer Encoder
-        combined = torch.cat([xq, xi], dim=1)  # (B, lQ+49, 512)
+        # 3) Fuse => Transformer Encoder
+        combined = torch.cat([xq, xi], dim=1)  # (B, lQ + 197, 512)
         enc_out = self.transformer_encoder(combined)
 
-        # 4) Transformer Decoder
-        if self.training and decoder_input_ids is not None:
-            # Teacher Forcing
+        # 4) Decoder
+        if decoder_input_ids is not None:
+            # => Teacher Forcing => (B, seq_len, vocab_size)
             tgt_emb = self.decoder_embedding(decoder_input_ids)  # (B, lAns, 512)
-            tgt_emb = tgt_emb.transpose(0, 1)  # => (lAns, B, 512)
+            tgt_emb = tgt_emb.transpose(0, 1)                    # (lAns, B, 512)
             tgt_emb = self.pos_encoding_dec(tgt_emb)
-            tgt_emb = tgt_emb.transpose(0, 1)  # => (B, lAns, 512)
+            tgt_emb = tgt_emb.transpose(0, 1)                    # (B, lAns, 512)
 
             lAns = decoder_input_ids.size(1)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(lAns).to(tgt_emb.device)
@@ -111,7 +99,7 @@ class TraPVQA(nn.Module):
             logits = self.output_layer(dec_out)  # (B, lAns, vocab_size)
             return logits
         else:
-            # Inference (Greedy)
+            # => Inference
             max_len = 20
             batch_size = images.size(0)
             dec_input = torch.full((batch_size, 1), 2, dtype=torch.long, device=images.device)  # <SOS>=2
