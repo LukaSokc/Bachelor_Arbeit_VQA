@@ -21,7 +21,8 @@ class Config:
 
     # Neuer Arrow-Pfad
     TRAIN_ARROW_DIR: str = os.path.join("data", "train")  # z. B. data/raw/train/
-    VAL_ARROW_DIR: str = os.path.join("data", "validation")  # z. B. data/raw/validation/
+    VAL_ARROW_DIR: str = os.path.join("data", "validation")
+    TEST_ARROW_DIR: str = os.path.join("data", "test")# z. B. data/raw/validation/
 
     # Trainings-Hyperparameter
     EPOCHS: int = 5
