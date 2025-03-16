@@ -25,6 +25,8 @@ from transformers import AutoTokenizer
 def test_loop(model, dataloader, criterion, device):
     """
     Test-Schleife: keine Backprop, nur Forward + Metriken (Loss, z. B. Accuracy)
+    Hier nutzen wir Teacher Forcing (decoder_input_ids), um denselben Pfad
+    wie im Training zu durchlaufen und einen Token-Level-Loss zu messen.
     """
     model.eval()
     total_loss = 0
@@ -37,21 +39,19 @@ def test_loop(model, dataloader, criterion, device):
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             decoder_input_ids = batch["decoder_input_ids"].to(device)
-            # Hier je nach Modell-Output anpassen.
-            # Wir gehen davon aus, dass logits: (B, seq_len, vocab_size).
-            logits = model(images, input_ids, attention_mask, decoder_input_ids=None)
 
-            # Wenn dein Modell generativ ist, musst du es ggf. anders handhaben.
-            # Hier ein Dummy-Beispiel: wir tun so, als wäre es Klassifikation
-            # => cross-entropy loss:
+            # Wichtig: Wir geben decoder_input_ids=decoder_input_ids mit, NICHT None!
+            logits = model(images, input_ids, attention_mask, decoder_input_ids=decoder_input_ids)
+            # => logits: (B, seq_len, vocab_size)
+
+            # CrossEntropyLoss: vergleicht pro Token
             loss = criterion(logits.transpose(1, 2), decoder_input_ids)
             total_loss += loss.item()
 
-            # Bsp: Wir werten "korrekte Tokens" aus.
-            # (In einer realen Klassifikationsaufgabe hättest du was anderes)
+            # Beispiel: "korrekte Tokens" - wir nehmen argmax pro Token
             preds = logits.argmax(dim=-1)  # (B, seq_len)
-            # Dummy: wir vergleichen "decoder_input_ids"
-            # (VORSICHT: in der Praxis müsstest du SHIFTEN!)
+            # Dummy: wir zählen, wie oft die gesamte Sequenz stimmt
+            # (Achtung: in einem echten generativen Modell oft SHIFT nötig)
             correct = (preds == decoder_input_ids).all(dim=1).sum().item()
             total_correct += correct
             total_samples += images.size(0)
@@ -64,16 +64,14 @@ def main():
     cfg = Config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Seed (optional)
     torch.manual_seed(cfg.SEED)
     torch.cuda.manual_seed_all(cfg.SEED)
 
-    # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(cfg.BIOBERT_MODEL)
 
     # Lade Testdaten
-    test_arrow_dir = cfg.TEST_ARROW_DIR  # z. B. "data/test"
-    image_dir = cfg.DATA_DIR            # falls du Bilder brauchst
+    test_arrow_dir = cfg.TEST_ARROW_DIR  # z. B. "data/raw/test"
+    image_dir = cfg.DATA_DIR
 
     test_ds = PathVQADataset(
         arrow_dir=test_arrow_dir,
@@ -107,7 +105,7 @@ def main():
     ).to(device)
 
     # Lade Bestes Modell
-    best_model_path = os.path.join(cfg.MODEL_DIR, "resnet50_biobert_2025-03-16_17-50-04.pt")  # <--- anpassen
+    best_model_path = os.path.join(cfg.MODEL_DIR, "resnet50_biobert_2025-03-16_17-50-04.pt")
     if not os.path.exists(best_model_path):
         raise FileNotFoundError(f"Checkpoint {best_model_path} nicht gefunden!")
 
