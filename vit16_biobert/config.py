@@ -15,9 +15,9 @@ class Config:
     # Pfade
     DATA_DIR: str = os.path.join("data")
     PROCESSED_DATA_DIR: str = os.path.join("data")
-    LOG_DIR: str = "logs"
-    MODEL_DIR: str = "models"
-    DOCS_DIR: str = "docs"
+    LOG_DIR: str = os.path.join("logs", "vit16")
+    MODEL_DIR: str = os.path.join("models", "vit16")
+    DOCS_DIR: str = os.path.join("docs", "vit16")
 
     # Neuer Arrow-Pfad
     TRAIN_ARROW_DIR: str = os.path.join("data", "train")  # z. B. data/raw/train/
@@ -25,9 +25,9 @@ class Config:
     TEST_ARROW_DIR: str = os.path.join("data", "test")
 
     # Trainings-Hyperparameter
-    EPOCHS: int = 5
-    BATCH_SIZE: int = 8
-    LR: float = 1e-4
+    EPOCHS: int = 15
+    BATCH_SIZE: int = 6
+    LR: float = 1e-5
     SEED: int = 42
 
     # Modell-Hyperparameter
