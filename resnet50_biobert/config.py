@@ -15,19 +15,19 @@ class Config:
     # Pfade
     DATA_DIR: str = os.path.join("data")
     PROCESSED_DATA_DIR: str = os.path.join("data")
-    LOG_DIR: str = "logs"
-    MODEL_DIR: str = "models"
-    DOCS_DIR: str = "docs"
+    LOG_DIR: str = os.path.join("logs", "resnet50")
+    MODEL_DIR: str = os.path.join("models", "resnet50")
+    DOCS_DIR: str = os.path.join("docs", "resnet50")
 
     # Neuer Arrow-Pfad
     TRAIN_ARROW_DIR: str = os.path.join("data", "train")  # z. B. data/raw/train/
-    VAL_ARROW_DIR: str = os.path.join("data", "validation")
-    TEST_ARROW_DIR: str = os.path.join("data", "test")# z. B. data/raw/validation/
+    VAL_ARROW_DIR: str = os.path.join("data", "validation")  # z. B. data/raw/validation/
+    TEST_ARROW_DIR: str = os.path.join("data", "test")
 
     # Trainings-Hyperparameter
-    EPOCHS: int = 5
-    BATCH_SIZE: int = 8
-    LR: float = 1e-4
+    EPOCHS: int = 15
+    BATCH_SIZE: int = 6
+    LR: float = 1e-5
     SEED: int = 42
 
     # Modell-Hyperparameter

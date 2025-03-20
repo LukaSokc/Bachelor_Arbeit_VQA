@@ -174,3 +174,6 @@ cython_debug/
 .pypirc
 /data/raw/
 /data/
+models/vit16_biobert_2025-03-16_22-34-37.pt
+docs/train_batch_logs.csv
+docs/train_epoch_logs.csv
