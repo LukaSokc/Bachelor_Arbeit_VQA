@@ -4,11 +4,11 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
-from vit16_biobert.config import Config
-from vit16_biobert.dataset import PathVQADataset
-from vit16_biobert.model_vit import VisionTransformerExtractor
-from vit16_biobert.model_text import BioBERTBiLSTM
-from vit16_biobert.model_transformer import TraPVQA
+from resnet50_biobert.config import Config
+from resnet50_biobert.dataset import PathVQADataset
+from resnet50_biobert.model_cnn import ImageFeatureExtractor
+from resnet50_biobert.model_text import BioBERTBiLSTM
+from resnet50_biobert.model_transformer import TraPVQA
 
 
 def main():
@@ -35,10 +35,9 @@ def main():
         dropout=cfg.DROPOUT,
         max_len=cfg.MAX_QUESTION_LEN
     )
-    image_encoder = VisionTransformerExtractor(
-        model_name="google/vit-base-patch16-224",
-        out_dim=512,
-        dropout=cfg.DROPOUT
+    image_encoder = ImageFeatureExtractor(
+        dropout=cfg.DROPOUT,
+        out_channels=512
     )
 
     # Gesamtmodell zusammenbauen
@@ -53,8 +52,9 @@ def main():
         dropout=cfg.DROPOUT
     ).to(device)
 
-    # Lade deinen gespeicherten Checkpoint (verwende den Pfad deines trainierten Modells)
-    checkpoint_path = os.path.join(cfg.MODEL_DIR, "vit16_biobert_2025-03-21_13-49-55.pt")
+    # Lade den gespeicherten Checkpoint
+    # Passe den Dateinamen ggf. an, falls du einen anderen Checkpoint gespeichert hast
+    checkpoint_path = os.path.join(cfg.MODEL_DIR, "resnet50_biobert_2025-03-23_10-09-44.pt")
     if os.path.exists(checkpoint_path):
         model.load_state_dict(torch.load(checkpoint_path, map_location=device))
         print(f"Checkpoint {checkpoint_path} wurde geladen.")
@@ -62,33 +62,33 @@ def main():
         print(f"Checkpoint {checkpoint_path} wurde nicht gefunden. Bitte überprüfe den Pfad.")
         return
 
-    # Schalte das Modell in den Evaluierungsmodus
+    # Modell in den Evaluierungsmodus schalten
     model.eval()
 
-    # Anzahl der zu inspizierenden Beispiele (anpassen, falls gewünscht)
-    num_examples = 500
+    # Anzahl der zu inspizierenden Beispiele (hier z.B. 5)
+    num_examples = 50
     with torch.no_grad():
         for i, batch in enumerate(test_loader):
             if i >= num_examples:
                 break
 
-            # Lade Batch-Daten
+            # Batch-Daten laden
             images = batch["image"].to(device)  # (1, 3, 224, 224)
             input_ids = batch["input_ids"].to(device)  # (1, lQ)
             attention_mask = batch["attention_mask"].to(device)  # (1, lQ)
             gold_answer = batch["answer_text"][0]  # Richtige Antwort als String
 
-            # Inferenz: Ohne decoder_input_ids wird der Inferenzmodus genutzt
+            # Inferenz: Ohne decoder_input_ids wird der auto-regressive Modus genutzt
             outputs = model(images, input_ids, attention_mask)
             # outputs hat Dimension (B, max_len) mit B=1
             pred_tokens = outputs[0].tolist()
-            # Token in lesbaren Text umwandeln (skip_special_tokens entfernt Sondertokens)
+            # Tokens in lesbaren Text umwandeln
             pred_text = tokenizer.decode(pred_tokens, skip_special_tokens=True)
 
             print(f"Beispiel {i + 1}:")
             print(f"Frage: {tokenizer.decode(input_ids[0], skip_special_tokens=True)}")
             print(f"Modell-Antwort: {pred_text}")
-            print(f"Richtige-Antwort: {gold_answer}")
+            print(f"Richtige Antwort: {gold_answer}")
             print("-" * 50)
 
 

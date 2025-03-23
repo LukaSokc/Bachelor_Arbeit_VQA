@@ -19,7 +19,7 @@ class Config:
     MODEL_DIR: str = os.path.join("models", "vit16")
     DOCS_DIR: str = os.path.join("docs", "vit16")
 
-    # Neuer Arrow-Pfad
+    # Neuer Arrow-Pfaddd
     TRAIN_ARROW_DIR: str = os.path.join("data", "train")  # z. B. data/raw/train/
     VAL_ARROW_DIR: str = os.path.join("data", "validation")  # z. B. data/raw/validation/
     TEST_ARROW_DIR: str = os.path.join("data", "test")
