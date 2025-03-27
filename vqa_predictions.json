@@ -1,0 +1,32 @@
+[
+  {
+    "index": 0,
+    "question": "where are liver stem cells (oval cells) located?",
+    "true_answer": "in the canals of hering",
+    "predicted_answer": "Periportal."
+  },
+  {
+    "index": 1,
+    "question": "what are stained here with an immunohistochemical stain for cytokeratin 7?",
+    "true_answer": "bile duct cells and canals of hering",
+    "predicted_answer": "Epithelial cells."
+  },
+  {
+    "index": 2,
+    "question": "what do the areas of white chalky deposits represent?",
+    "true_answer": "foci of fat necrosis",
+    "predicted_answer": "Calcification."
+  },
+  {
+    "index": 3,
+    "question": "is embolus derived from a lower-extremity deep venous thrombus lodged in a pulmonary artery branch?",
+    "true_answer": "yes",
+    "predicted_answer": "Yes."
+  },
+  {
+    "index": 4,
+    "question": "how is hyperplasia without atypia characterized?",
+    "true_answer": "by nests of closely packed glands",
+    "predicted_answer": "Hyperplasia."
+  }
+]
