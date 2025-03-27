@@ -11,7 +11,7 @@ import csv
 
 model_id = "google/gemma-3-4b-it"
 model = Gemma3ForConditionalGeneration.from_pretrained(
-    model_id, device_map="auto"
+    model_id, device_map={"":0},torch_dtype=torch.bfloat16
 ).eval()
 processor = AutoProcessor.from_pretrained(model_id, use_fast = True)
 
@@ -21,13 +21,14 @@ if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
 else:
     dtype = torch.float
 
+print("🖥️ Torch device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU only")
 # 📁 Load your PathVQA data
 project_root = Path.cwd().parent
-data_path = project_root / "Bachelor_Arbeit_VQA" / "data" / "validation"  # or "val"
+data_path = project_root / "data" / "validation"  
 dataset = load_from_disk(str(data_path))
 
 # 📄 Output CSV setup
-output_file = "data/llm_answers/gemma_no_system_prompt.csv"
+output_file = "../data/llm_answers/gemma_no_system_prompt.csv"
 fieldnames = ["ID", "question", "correct_answer", "model_output"]
 
 with open(output_file, mode="w", newline='', encoding="utf-8") as f:
@@ -90,3 +91,4 @@ with open(output_file, mode="w", newline='', encoding="utf-8") as f:
             continue
 
 print("✅ All results saved to gemma_no_system_prompt.csv")
+>>>>>>> ed731c5 (nothing new)
