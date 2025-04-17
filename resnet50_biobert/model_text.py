@@ -24,7 +24,6 @@ class BioBERTBiLSTM(nn.Module):
             bidirectional=True
         )
         self.output_dim = lstm_hidden * 2  # 512
-
         self.linear = nn.Linear(self.output_dim, 512)
         self.dropout = nn.Dropout(dropout)
 
@@ -38,14 +37,10 @@ class BioBERTBiLSTM(nn.Module):
         """
         outputs = self.biobert(input_ids=input_ids, attention_mask=attention_mask)
         last_hidden = outputs.last_hidden_state  # (B, seq_len, 768)
-
         lstm_out, _ = self.bilstm(last_hidden)   # (B, seq_len, 512)
         proj = self.linear(lstm_out)
         proj = self.dropout(proj)
-
-        # Positional Encoding erwartet (seq_len, B, 512)
         proj = proj.transpose(0, 1)
         proj = self.pos_encoding(proj)
         proj = proj.transpose(0, 1)
-
         return proj

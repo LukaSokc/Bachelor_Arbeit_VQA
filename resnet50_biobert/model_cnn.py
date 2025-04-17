@@ -20,7 +20,6 @@ class ImageFeatureExtractor(nn.Module):
         self.conv = nn.Conv2d(2048, out_channels, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
-
         self.linear = nn.Linear(out_channels, 512)
 
     def forward(self, x):
@@ -32,10 +31,7 @@ class ImageFeatureExtractor(nn.Module):
         feats = self.conv(feats)       # (B, 512, 7, 7)
         feats = self.relu(feats)
         feats = self.dropout(feats)
-
-        # Flatten
         feats = feats.flatten(start_dim=2)  # (B, 512, 49)
         feats = feats.transpose(1, 2)       # (B, 49, 512)
-
         feats = self.linear(feats)         # (B, 49, 512)
         return feats

@@ -10,7 +10,6 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
-
 from datasets import load_from_disk
 
 class PathVQADataset(Dataset):
@@ -39,7 +38,6 @@ class PathVQADataset(Dataset):
 
         # Frage
         question = str(sample["question"])
-        # -> tokenisieren
         encoded_q = self.tokenizer(
             question,
             truncation=True,
@@ -51,14 +49,13 @@ class PathVQADataset(Dataset):
 
         # Antwort
         answer = str(sample["answer"])
-        # -> tokenisieren
         encoded_a = self.tokenizer(
             answer,
             truncation=True,
             max_length=self.max_length,
             padding="max_length"
         )
-        # Das hier wird dein "Gold"-Label für Teacher Forcing
+        # "Gold"-Label für Teacher Forcing
         decoder_input_ids = torch.tensor(encoded_a["input_ids"], dtype=torch.long)
 
         return {
